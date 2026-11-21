@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Guardia — SmartPark ST</title>
+  <link rel="stylesheet" href="guardia.css" />
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Topbar limpia -->
+    <header class="topbar">
+      <a href="index.html" class="icon-btn" aria-label="Volver al inicio">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </a>
+
+      <h1 class="topbar-title">Panel de Acceso</h1>
+
+      <button class="icon-btn" onclick="openHistoryModal()" aria-label="Ver historial" title="Historial">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <polyline points="12 7 12 12 15 15"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Barra de estado de conexión (solo llama la atención si está offline) -->
+    <div id="connStatusBar" class="conn-bar online">
+      <span id="connStatusText">● En línea · Sincronizado</span>
+      <span id="pendingBadge" class="pending-badge hidden">0 pendientes</span>
+    </div>
+
+    <!-- Pantalla principal: todo a la vista, sin scroll, cero ruido -->
+    <main class="main-content">
+      <!-- Aforo Actual -->
+      <section class="aforo-card">
+        <span class="aforo-label">Aforo Actual</span>
+        <div class="aforo-numbers">
+          <span class="aforo-current" id="aforoCurrent">--</span>
+          <span class="aforo-max">/ <span id="aforoMax">--</span></span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+        <span class="aforo-free" id="freeText">Conectando a base de datos...</span>
+      </section>
+
+      <!-- Feedback breve (solo aparece tras una acción) -->
+      <div id="feedbackBanner" class="feedback-banner hidden" role="status"></div>
+
+      <!-- Botón Principal: Escanear Pase QR -->
+      <button class="btn-scan-qr" onclick="openCameraScanner()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <span>Escanear Pase QR</span>
+      </button>
+
+      <!-- Botones grandes +1 / -1 -->
+      <section class="counter-grid">
+        <button class="btn-action btn-ingreso" onclick="requestConfirm(1, 'Ingreso')">
+          <span class="action-num">+1</span>
+          <span class="action-text">Ingreso</span>
+        </button>
+
+        <button class="btn-action btn-salida" onclick="requestConfirm(-1, 'Salida')">
+          <span class="action-num">-1</span>
+          <span class="action-text">Salida</span>
+        </button>
+      </section>
+
+      <!-- Botón simple para Visitas -->
+      <button class="btn-visit" onclick="openVisitModal()">
+        <span>+ Registrar Visita</span>
+      </button>
+    </main>
+  </div>
+
+  <!-- MODAL CONFIRMACIÓN ("¿Estás seguro?") -->
+  <div id="confirmModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="confirm-icon" id="confirmIcon">🚗</div>
+      <h3 id="confirmTitle">¿Estás seguro?</h3>
+      <p id="confirmDesc">Confirma para evitar toques accidentales.</p>
+      <div class="modal-btn-row">
+        <button class="btn-cancel" onclick="closeConfirmModal()">Cancelar</button>
+        <button class="btn-confirm" id="btnConfirmExecute" onclick="executeConfirmedAction()">Sí, confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CÁMARA QR -->
+  <div id="cameraModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <h3>Escanear Pase QR</h3>
+          <p id="cameraStatusText">Apunta al código QR</p>
+        </div>
+        <button class="btn-close" onclick="closeCameraScanner()" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="camera-viewport">
+        <video id="cameraVideo" playsinline autoplay muted></video>
+        <canvas id="cameraCanvas" class="hidden"></canvas>
+        <div class="scan-frame"><div class="scan-line"></div></div>
+
+        <div id="cameraFallbackOverlay" class="camera-fallback hidden">
+          <p>Cámara en vivo no disponible</p>
+          <label class="btn-native-cam">
+            📷 Abrir Cámara del Teléfono
+            <input type="file" accept="image/*" capture="environment" onchange="handleQrImageUpload(event)" hidden />
+          </label>
+        </div>
+      </div>
+
+      <div class="manual-code-row">
+        <input type="text" id="manualQrInput" placeholder="Código dinámico (RUT-XXXXXX)..." />
+        <button onclick="validateManualQr()">Validar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL REGISTRAR VISITA -->
+  <div id="visitModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <h3>Registrar Visita</h3>
+          <p>Suma +1 al aforo actual</p>
+        </div>
+        <button class="btn-close" onclick="closeVisitModal()">✕</button>
+      </div>
+
+      <form onsubmit="submitVisit(event)" class="visit-form">
+        <input type="text" id="visitReason" required placeholder="Motivo / Destino (ej: Reunión, Proveedor)" />
+        <div class="modal-btn-row">
+          <button type="button" class="btn-cancel" onclick="closeVisitModal()">Cancelar</button>
+          <button type="submit" class="btn-confirm green">Ingresar (+1)</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL HISTORIAL (Oculto por defecto para no molestar) -->
+  <div id="historyModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <h3>Historial Reciente</h3>
+          <p>Últimos movimientos de hoy</p>
+        </div>
+        <button class="btn-close" onclick="closeHistoryModal()">✕</button>
+      </div>
+
+      <ul class="log-list" id="logList"></ul>
+
+      <div class="history-actions">
+        <button class="btn-offline-sim" id="btnToggleOffline" onclick="toggleSimulatedOffline()">Simular corte de internet</button>
+        <button class="btn-reset-subtle" onclick="resetGuardiaData()">Reiniciar contador</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="guardia.js"></script>
+</body>
+</html>

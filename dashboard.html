@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — SmartPark ST</title>
+  <link rel="stylesheet" href="dashboard.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <!-- SIDEBAR IZQUIERDO (Limpio, sin Comunidad ni accesos redundantes) -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">P</div>
+        <span class="brand-name">SmartPark <strong>ST</strong></span>
+      </div>
+
+      <div class="nav-group">
+        <span class="nav-title">MENÚ</span>
+        <button class="nav-item active" data-tab="resumen" onclick="switchTab('resumen')">
+          <span class="nav-icon">⊞</span>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-item" data-tab="registros" onclick="switchTab('registros')">
+          <span class="nav-icon">📋</span>
+          <span>Flujo Anónimo</span>
+          <span class="nav-badge" id="navLogsBadge">0</span>
+        </button>
+        <button class="nav-item" data-tab="analitica" onclick="switchTab('analitica')">
+          <span class="nav-icon">📊</span>
+          <span>Analítica</span>
+        </button>
+        <a href="index.html" class="nav-item">
+          <span class="nav-icon">←</span>
+          <span>Volver al Inicio</span>
+        </a>
+      </div>
+
+      <div class="sidebar-promo">
+        <div class="promo-tag">🔒 Privacidad Activa</div>
+        <h4>Datos 100% Anónimos</h4>
+        <p>Solo se procesan métricas de ocupación y flujo. No se almacenan nombres, RUTs ni patentes.</p>
+      </div>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="main-area">
+      <!-- Topbar Global -->
+      <header class="topbar">
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input type="text" id="globalSearch" placeholder="Buscar por tipo de evento o área..." oninput="handleGlobalSearch()" />
+          <kbd>⌘ F</kbd>
+        </div>
+
+        <div class="topbar-right">
+          <div class="admin-chip">
+            <div class="admin-avatar">ST</div>
+            <div>
+              <strong>Administración</strong>
+              <span>Sede Santo Tomás</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- =========================================================
+           VISTA 1: RESUMEN (DASHBOARD PRINCIPAL)
+           ========================================================= -->
+      <div id="tab-resumen" class="tab-view active">
+        <section class="page-head">
+          <div>
+            <h1>Dashboard</h1>
+            <p>Análisis de ocupación, horas punta y comportamiento del estacionamiento en tiempo real.</p>
+          </div>
+          <div class="head-actions">
+            <button class="btn-outline-pill" onclick="switchTab('analitica')">Ver Analítica →</button>
+          </div>
+        </section>
+
+        <!-- 4 KPIs Relevantes -->
+        <section class="kpi-row">
+          <article class="kpi-card hero-green">
+            <div class="kpi-head">
+              <span>Aforo Actual</span>
+              <span class="circle-arrow light">🅿️</span>
+            </div>
+            <div class="kpi-big" id="kpiAforo">-- <small>/ 108</small></div>
+            <div class="kpi-foot" id="kpiAforoSub">Cargando disponibilidad...</div>
+          </article>
+
+          <article class="kpi-card">
+            <div class="kpi-head">
+              <span>Ingresos Registrados</span>
+              <button class="circle-arrow" onclick="switchTab('registros')">↗</button>
+            </div>
+            <div class="kpi-big" id="kpiEntries">0</div>
+            <div class="kpi-foot" id="kpiEntriesSub">0 por QR · 0 manual/visitas</div>
+          </article>
+
+          <article class="kpi-card">
+            <div class="kpi-head">
+              <span>Salidas y Rechazos</span>
+              <button class="circle-arrow" onclick="switchTab('registros')">↗</button>
+            </div>
+            <div class="kpi-big" id="kpiExits">0</div>
+            <div class="kpi-foot" id="kpiExitsSub">0 salidas · 0 QR rechazados</div>
+          </article>
+
+          <article class="kpi-card">
+            <div class="kpi-head">
+              <span>Cupos Jefatura Prestados</span>
+              <span class="circle-arrow">⭐</span>
+            </div>
+            <div class="kpi-big" id="kpiJefatura">0</div>
+            <div class="kpi-foot" id="kpiJefaturaSub">Disponibles para docentes</div>
+          </article>
+        </section>
+
+        <!-- Bento Medio -->
+        <section class="bento-row-mid">
+          <div class="bento-card span-2">
+            <div class="card-head">
+              <div>
+                <h2>Uso por Día de la Semana</h2>
+                <p>Flujo promedio de ingresos según el día (Lun - Dom)</p>
+              </div>
+              <button class="btn-link-sm" onclick="switchTab('analitica')">Ver por año →</button>
+            </div>
+            <div class="chart-box">
+              <canvas id="weeklyPreviewChart"></canvas>
+            </div>
+          </div>
+
+          <div class="bento-card">
+            <div class="card-head">
+              <div>
+                <h2>Jefaturas por Área</h2>
+                <p>Estado anónimo de préstamos</p>
+              </div>
+            </div>
+            <div id="jefaturaList" class="jefe-stack">
+              <p class="muted-empty">Sin préstamos activos hoy.</p>
+            </div>
+          </div>
+
+          <div class="bento-card">
+            <div class="card-head">
+              <div>
+                <h2>Tipos de Acceso</h2>
+                <p>Proporción por perfil</p>
+              </div>
+            </div>
+            <div class="chart-box-sm">
+              <canvas id="typeChart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- Bento Inferior -->
+        <section class="bento-row-bot">
+          <div class="bento-card span-2">
+            <div class="card-head">
+              <div>
+                <h2>Flujo Reciente (Anónimo)</h2>
+                <p>Eventos operativos sin datos personales</p>
+              </div>
+              <button class="btn-link-sm" onclick="switchTab('registros')">Ver todos →</button>
+            </div>
+            <div class="logs-scroll" id="logsPreviewList">
+              <p class="muted-empty">Cargando flujo...</p>
+            </div>
+          </div>
+
+          <div class="bento-card">
+            <div class="card-head">
+              <div>
+                <h2>Ocupación del Recinto</h2>
+                <p>Porcentaje actual en uso</p>
+              </div>
+            </div>
+            <div class="gauge-wrap">
+              <canvas id="gaugeChart"></canvas>
+              <div class="gauge-center">
+                <strong id="gaugePercent">0%</strong>
+                <span>Ocupado</span>
+              </div>
+            </div>
+            <div class="gauge-legend">
+              <span><i class="dot-green"></i> Ocupado</span>
+              <span><i class="dot-gray"></i> Disponible</span>
+            </div>
+          </div>
+
+          <div class="bento-card dark-tracker">
+            <div class="tracker-top">
+              <span>Indicadores Operativos</span>
+              <strong class="live-clock" id="liveClock">--:--:--</strong>
+            </div>
+            <div class="community-stats">
+              <div class="c-stat"><strong id="statPeakHour">08:30</strong><span>Hora Punta</span></div>
+              <div class="c-stat"><strong id="statQrRate">0%</strong><span>Uso QR</span></div>
+              <div class="c-stat"><strong id="statRejectRate">0%</strong><span>Rechazos</span></div>
+            </div>
+            <p class="tracker-note">Métricas estadísticas agregadas en tiempo real (sin identificación de usuarios).</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- =========================================================
+           VISTA 2: FLUJO ANÓNIMO (SIN RUTS NI NOMBRES)
+           ========================================================= -->
+      <div id="tab-registros" class="tab-view">
+        <section class="page-head">
+          <div>
+            <h1>Flujo Operativo Anónimo</h1>
+            <p>Eventos agregados de entrada, salida y validación QR sin datos personales.</p>
+          </div>
+          <div class="head-actions">
+            <select id="filterKind" class="btn-outline-pill" onchange="renderFullLogsTable()">
+              <option value="all">Todos los eventos</option>
+              <option value="plus">Solo Ingresos (+1)</option>
+              <option value="minus">Solo Salidas (-1)</option>
+              <option value="invalid">Solo QR Rechazados (0)</option>
+            </select>
+          </div>
+        </section>
+
+        <div class="bento-card">
+          <div class="card-head">
+            <div>
+              <h2>Eventos del Recinto</h2>
+              <p>Ordenados del más reciente al más antiguo (datos anonimizados)</p>
+            </div>
+            <span class="pill-count" id="logsCountPill">0 eventos</span>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Categoría</th>
+                  <th>Área / Motivo</th>
+                  <th>Impacto</th>
+                </tr>
+              </thead>
+              <tbody id="fullLogsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           VISTA 3: ANALÍTICA (DÍAS DE LA SEMANA, AÑOS Y HORAS PUNTA)
+           ========================================================= -->
+      <div id="tab-analitica" class="tab-view">
+        <section class="page-head">
+          <div>
+            <h1>Analítica Histórica y Tendencias</h1>
+            <p>Uso por día de la semana, comparativa anual y horas de mayor congestión.</p>
+          </div>
+          <div class="head-actions">
+            <select id="analyticsYearSelect" class="btn-outline-pill" onchange="renderAnalyticsView()">
+              <option value="2026" selected>Año 2026 (Actual)</option>
+              <option value="2025">Año 2025</option>
+              <option value="2024">Año 2024</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- Insights rápidos -->
+        <section class="kpi-row">
+          <article class="kpi-card">
+            <div class="kpi-head"><span>Día de Mayor Demanda</span></div>
+            <div class="kpi-big" id="insightPeakDay">Jueves</div>
+            <div class="kpi-foot">Promedio 96% de ocupación matinal</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-head"><span>Hora Punta Crítica</span></div>
+            <div class="kpi-big" id="insightPeakHour">08:30</div>
+            <div class="kpi-foot">Mayor flujo de ingreso vehicular</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-head"><span>Días al 100% (Año)</span></div>
+            <div class="kpi-big" id="insightFullDays">38</div>
+            <div class="kpi-foot" id="insightYearLabel">Temporada 2026</div>
+          </article>
+          <article class="kpi-card">
+            <div class="kpi-head"><span>Total Ingresos (Año)</span></div>
+            <div class="kpi-big" id="insightYearTotal">28.4k</div>
+            <div class="kpi-foot">Acumulado anual anónimo</div>
+          </article>
+        </section>
+
+        <section class="analytics-grid">
+          <div class="bento-card">
+            <div class="card-head">
+              <div>
+                <h2>Uso Mensual Comparado (<span id="lblChartYear">2026</span>)</h2>
+                <p>Total de vehículos ingresados por mes (incluye flujo en vivo en el mes actual)</p>
+              </div>
+            </div>
+            <div class="chart-box-lg">
+              <canvas id="yearlyChart"></canvas>
+            </div>
+          </div>
+
+          <div class="bento-card">
+            <div class="card-head">
+              <div>
+                <h2>Flujo por Hora del Día (En Vivo)</h2>
+                <p>Ingresos vs. salidas agrupados por franja horaria</p>
+              </div>
+            </div>
+            <div class="chart-box-lg">
+              <canvas id="hourlyAnalyticsChart"></canvas>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>
